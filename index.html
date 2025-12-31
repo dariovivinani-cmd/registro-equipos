@@ -62,15 +62,42 @@
         const ahora = new Date();
         ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
         document.getElementById('fechaHora').value = ahora.toISOString().slice(0,16);
-        
-        checkQueue();
+        processQueue();
     };
 
-    const toBase64 = file => new Promise((resolve) => {
-        if(!file) return resolve(null);
+    // FUNCIÓN PARA COMPRIMIR FOTOS (Reduce a un tamaño manejable)
+    const resizeImage = (file) => new Promise((resolve) => {
+        if (!file) return resolve(null);
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 800; // Tamaño máximo de ancho
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_WIDTH) {
+                        width *= MAX_WIDTH / height;
+                        height = MAX_WIDTH;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                // Comprime al 70% de calidad para que sea liviano
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+        };
     });
 
     document.getElementById('mainForm').onsubmit = async (e) => {
@@ -79,7 +106,7 @@
         const st = document.getElementById('status');
         btn.disabled = true;
         st.style.display = "block";
-        st.innerText = "⏳ Procesando...";
+        st.innerText = "⏳ Comprimiendo fotos...";
         st.style.color = "white";
 
         const payload = {
@@ -90,17 +117,17 @@
             responsable: document.getElementById('responsable').value,
             tipo: document.getElementById('tipo').value,
             descripcion: document.getElementById('descripcion').value,
-            fotoAntes: await toBase64(document.getElementById('foto1').files[0]),
-            fotoDespues: await toBase64(document.getElementById('foto2').files[0])
+            fotoAntes: await resizeImage(document.getElementById('foto1').files[0]),
+            fotoDespues: await resizeImage(document.getElementById('foto2').files[0])
         };
 
         addToQueue(payload);
         
         if (navigator.onLine) {
-            st.innerText = "🚀 Enviando...";
+            st.innerText = "🚀 Enviando datos...";
             processQueue();
         } else {
-            st.innerText = "⚠️ Guardado en memoria (Sin Internet)";
+            st.innerText = "⚠️ Guardado local (Sin Internet)";
             st.style.color = "#ff9800";
             if(navigator.vibrate) navigator.vibrate([100,50,100]);
             setTimeout(() => location.reload(), 3000);
@@ -108,15 +135,15 @@
     };
 
     function addToQueue(item) {
-        let queue = JSON.parse(localStorage.getItem('form_queue') || "[]");
+        let queue = JSON.parse(localStorage.getItem('form_queue_v4') || "[]");
         queue.push(item);
-        localStorage.setItem('form_queue', JSON.stringify(queue));
+        localStorage.setItem('form_queue_v4', JSON.stringify(queue));
         checkQueue();
     }
 
     async function processQueue() {
         if (!navigator.onLine) return;
-        let queue = JSON.parse(localStorage.getItem('form_queue') || "[]");
+        let queue = JSON.parse(localStorage.getItem('form_queue_v4') || "[]");
         if (queue.length === 0) return;
 
         for (let item of queue) {
@@ -126,16 +153,15 @@
                     mode: 'no-cors',
                     body: JSON.stringify(item)
                 });
-                // Si el fetch no da error, eliminamos
-                let currentQueue = JSON.parse(localStorage.getItem('form_queue') || "[]");
+                let currentQueue = JSON.parse(localStorage.getItem('form_queue_v4') || "[]");
                 currentQueue = currentQueue.filter(q => q.id !== item.id);
-                localStorage.setItem('form_queue', JSON.stringify(currentQueue));
-            } catch (e) { console.log(e); break; }
+                localStorage.setItem('form_queue_v4', JSON.stringify(currentQueue));
+            } catch (e) { break; }
         }
 
         checkQueue();
         const st = document.getElementById('status');
-        if(st.innerText === "🚀 Enviando...") {
+        if(st.innerText.includes("Enviando")) {
             st.innerText = "✅ Registro Exitoso";
             st.style.color = "#00ff88";
             if(navigator.vibrate) navigator.vibrate(200);
@@ -144,16 +170,16 @@
     }
 
     function checkQueue() {
-        let queue = JSON.parse(localStorage.getItem('form_queue') || "[]");
+        let queue = JSON.parse(localStorage.getItem('form_queue_v4') || "[]");
         document.getElementById('pendingInfo').style.display = queue.length > 0 ? "block" : "none";
     }
 
     window.addEventListener('online', processQueue);
-    setInterval(processQueue, 15000);
+    setInterval(processQueue, 20000);
 </script>
-
 </body>
 </html>
+
 
 
 
