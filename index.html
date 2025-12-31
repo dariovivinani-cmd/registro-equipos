@@ -66,7 +66,6 @@
 
         #status { display: none; text-align: center; margin-top: 15px; font-weight: bold; padding: 10px; border-radius: 8px; }
         
-        /* Indicador de carga pendiente */
         #syncIcon { display: none; color: #ff9800; font-size: 0.8em; margin-top: 10px; text-align: center; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
     </style>
@@ -76,7 +75,10 @@
 <div class="container" id="formContainer">
     <div class="header">
         <span class="id-label" id="displayID">ESCANEE CÓDIGO</span>
-        <div id="syncIcon"><span class="material-symbols-rounded" style="font-size: 16px; vertical-align: middle;">sync_problem</span> Tienes registros pendientes</div>
+        <div id="syncIcon">
+            <span class="material-symbols-rounded" style="font-size: 16px; vertical-align: middle;">sync</span> 
+            Sincronizando registros pendientes...
+        </div>
     </div>
 
     <form id="mainForm">
@@ -142,7 +144,7 @@
             <span class="material-symbols-rounded">cloud_upload</span> GUARDAR REGISTRO
         </button>
         
-        <button type="button" class="btn-clear" onclick="window.location.reload()">
+        <button type="button" class="btn-clear" onclick="limpiarYReiniciar()">
             <span class="material-symbols-rounded">delete</span> LIMPIAR TODO
         </button>
     </form>
@@ -153,6 +155,12 @@
 <script>
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz98xny-dI8JXlQo0Q4imoaIJ7eqtK9E_N-04jJ9UtkADzzgP-j3gBsXStq0UCoNF8aKQ/exec";
 
+    function actualizarFecha() {
+        const ahora = new Date();
+        ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+        document.getElementById('fechaHora').value = ahora.toISOString().slice(0,16);
+    }
+
     window.onload = () => {
         const params = new URLSearchParams(window.location.search);
         const code = params.get('id');
@@ -160,14 +168,9 @@
             document.getElementById('hojaCodigo').value = code;
             document.getElementById('displayID').innerText = "ID: " + code;
         }
-        
-        const ahora = new Date();
-        ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
-        document.getElementById('fechaHora').value = ahora.toISOString().slice(0,16);
-
-        // Iniciar revisor constante
-        setInterval(checkOfflineData, 10000); // Revisa cada 10 segundos
-        checkOfflineData(); 
+        actualizarFecha();
+        checkOfflineData();
+        setInterval(checkOfflineData, 15000); // Reintento cada 15 seg
     };
 
     const toBase64 = file => new Promise((resolve) => {
@@ -184,10 +187,9 @@
         
         btn.disabled = true;
         st.style.display = "block";
-        st.innerText = "⏳ Procesando datos...";
+        st.innerText = "⏳ Procesando...";
         st.style.color = "#00a8ff";
 
-        // Captura de datos
         const payload = {
             hojaCodigo: document.getElementById('hojaCodigo').value || "SIN_ID",
             fechaHora: document.getElementById('fechaHora').value,
@@ -197,82 +199,88 @@
             descripcion: document.getElementById('descripcion').value,
             fotoAntes: await toBase64(document.getElementById('foto1').files[0]),
             fotoDespues: await toBase64(document.getElementById('foto2').files[0]),
-            timestamp: new Date().getTime()
+            idUnico: "ID_" + Date.now() // Generamos ID único para rastrear el registro
         };
 
-        // Guardamos siempre localmente primero por seguridad
-        saveLocally(payload);
-        
+        // PASO 1: Guardar en memoria local pase lo que pase
+        let cola = JSON.parse(localStorage.getItem('cola_registros') || "[]");
+        cola.push(payload);
+        localStorage.setItem('cola_registros', JSON.stringify(cola));
+
         if (navigator.onLine) {
-            st.innerText = "🚀 Enviando a la nube...";
-            await checkOfflineData(); // Dispara la sincronización inmediata
+            st.innerText = "🚀 Enviando...";
+            checkOfflineData(); // Intentar vaciar la cola inmediatamente
         } else {
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-            st.innerText = "⚠️ Guardado en el teléfono (Sin Internet)";
+            st.innerText = "⚠️ Guardado en memoria (Sin Internet)";
             st.style.color = "#ff9800";
-            setTimeout(() => window.location.reload(), 3000);
+            setTimeout(() => {
+                st.style.display = "none";
+                btn.disabled = false;
+                document.getElementById('mainForm').reset();
+                actualizarFecha();
+                document.getElementById('syncIcon').style.display = "block";
+            }, 3000);
         }
     };
-
-    function saveLocally(payload) {
-        let pending = JSON.parse(localStorage.getItem('pendingSync') || "[]");
-        pending.push(payload);
-        localStorage.setItem('pendingSync', JSON.stringify(pending));
-        actualizarIconoSync();
-    }
-
-    function actualizarIconoSync() {
-        let pending = JSON.parse(localStorage.getItem('pendingSync') || "[]");
-        document.getElementById('syncIcon').style.display = pending.length > 0 ? "block" : "none";
-    }
 
     async function checkOfflineData() {
         if (!navigator.onLine) return;
 
-        let pending = JSON.parse(localStorage.getItem('pendingSync') || "[]");
-        if (pending.length === 0) {
-            actualizarIconoSync();
+        let cola = JSON.parse(localStorage.getItem('cola_registros') || "[]");
+        if (cola.length === 0) {
+            document.getElementById('syncIcon').style.display = "none";
             return;
         }
 
-        // Si estamos en el formulario y enviando, mostramos estado
+        document.getElementById('syncIcon').style.display = "block";
         const st = document.getElementById('status');
-        
-        for (let i = 0; i < pending.length; i++) {
+
+        // Procesar uno por uno
+        for (let i = 0; i < cola.length; i++) {
+            const registro = cola[i];
             try {
-                // Usamos una petición fetch normal
                 const response = await fetch(WEB_APP_URL, {
                     method: 'POST',
-                    mode: 'no-cors', // Importante para Google Apps Script
-                    body: JSON.stringify(pending[i])
+                    mode: 'no-cors',
+                    body: JSON.stringify(registro)
                 });
 
-                // Si llegamos aquí, el navegador logró despachar el paquete
-                // Eliminamos de la memoria
-                let updated = JSON.parse(localStorage.getItem('pendingSync') || "[]");
-                updated = updated.filter(item => item.timestamp !== pending[i].timestamp);
-                localStorage.setItem('pendingSync', JSON.stringify(updated));
+                // Si se envió, lo borramos de la memoria
+                let colaActual = JSON.parse(localStorage.getItem('cola_registros') || "[]");
+                colaActual = colaActual.filter(item => item.idUnico !== registro.idUnico);
+                localStorage.setItem('cola_registros', JSON.stringify(colaActual));
                 
                 if (st.style.display === "block") {
-                    st.innerText = "✅ ¡Enviado con éxito!";
+                    st.innerText = "✅ Registro Exitoso";
                     st.style.color = "#00ff88";
                     if (navigator.vibrate) navigator.vibrate(200);
                     setTimeout(() => window.location.reload(), 2000);
                 }
             } catch (err) {
-                console.log("Reintento fallido, esperando conexión estable...");
-                break;
+                console.log("Error de conexión, el registro sigue en cola.");
+                break; // Parar si falla para no saturar
             }
         }
-        actualizarIconoSync();
+        
+        let colaFinal = JSON.parse(localStorage.getItem('cola_registros') || "[]");
+        document.getElementById('syncIcon').style.display = colaFinal.length > 0 ? "block" : "none";
     }
 
-    // Escuchar cuando el usuario vuelve a tocar la pantalla (despierta el navegador)
-    window.addEventListener('focus', checkOfflineData);
+    function limpiarYReiniciar() {
+        if(confirm("¿Seguro que quieres limpiar el formulario? Esto no borrará los registros pendientes de envío.")){
+            window.location.reload();
+        }
+    }
+
+    // Detectar cuando el internet regresa
     window.addEventListener('online', checkOfflineData);
+    // Detectar cuando el técnico vuelve a la pestaña
+    window.addEventListener('focus', checkOfflineData);
 </script>
 </body>
 </html>
+
 
 
 
