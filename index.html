@@ -65,6 +65,10 @@
         }
 
         #status { display: none; text-align: center; margin-top: 15px; font-weight: bold; padding: 10px; border-radius: 8px; }
+        
+        /* Indicador de carga pendiente */
+        #syncIcon { display: none; color: #ff9800; font-size: 0.8em; margin-top: 10px; text-align: center; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
     </style>
 </head>
 <body>
@@ -72,13 +76,14 @@
 <div class="container" id="formContainer">
     <div class="header">
         <span class="id-label" id="displayID">ESCANEE CÓDIGO</span>
+        <div id="syncIcon"><span class="material-symbols-rounded" style="font-size: 16px; vertical-align: middle;">sync_problem</span> Tienes registros pendientes</div>
     </div>
 
     <form id="mainForm">
         <input type="hidden" id="hojaCodigo">
 
         <div class="form-group">
-            <label>Fecha y Hora (Col A)</label>
+            <label>Fecha y Hora</label>
             <div class="input-box">
                 <span class="material-symbols-rounded">calendar_today</span>
                 <input type="datetime-local" id="fechaHora" required>
@@ -86,7 +91,7 @@
         </div>
 
         <div class="form-group">
-            <label>Duración (Col B, C, D)</label>
+            <label>Duración</label>
             <div class="input-box">
                 <span class="material-symbols-rounded">timer</span>
                 <input type="text" id="duracion" placeholder="Ej: 30 min / 1 hora" required>
@@ -94,7 +99,7 @@
         </div>
 
         <div class="form-group">
-            <label>Responsable (Col E, F)</label>
+            <label>Responsable</label>
             <div class="input-box">
                 <span class="material-symbols-rounded">person</span>
                 <input type="text" id="responsable" placeholder="Nombre del técnico" required>
@@ -102,7 +107,7 @@
         </div>
 
         <div class="form-group">
-            <label>Tipo (Col G, H)</label>
+            <label>Tipo</label>
             <div class="input-box">
                 <span class="material-symbols-rounded">settings</span>
                 <select id="tipo" required>
@@ -115,7 +120,7 @@
         </div>
 
         <div class="form-group">
-            <label>Descripción (Col I, J)</label>
+            <label>Descripción</label>
             <div class="input-box">
                 <span class="material-symbols-rounded" style="top:12px">edit_note</span>
                 <textarea id="descripcion" rows="3" placeholder="Detalle la actividad..." required style="padding-top:12px; padding-left: 42px;"></textarea>
@@ -124,11 +129,11 @@
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
-                <label>Foto Antes (K)</label>
+                <label>Foto Antes</label>
                 <input type="file" id="foto1" accept="image/*" capture="camera" style="padding-left:10px; font-size: 10px;">
             </div>
             <div class="form-group">
-                <label>Foto Después (L)</label>
+                <label>Foto Después</label>
                 <input type="file" id="foto2" accept="image/*" capture="camera" style="padding-left:10px; font-size: 10px;">
             </div>
         </div>
@@ -160,15 +165,15 @@
         ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
         document.getElementById('fechaHora').value = ahora.toISOString().slice(0,16);
 
-        // Intentar enviar datos apenas cargue la página si hay internet
-        setTimeout(checkOfflineData, 1000);
+        // Iniciar revisor constante
+        setInterval(checkOfflineData, 10000); // Revisa cada 10 segundos
+        checkOfflineData(); 
     };
 
     const toBase64 = file => new Promise((resolve) => {
         if(!file) return resolve(null);
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
-        reader.onerror = () => resolve(null);
         reader.readAsDataURL(file);
     });
 
@@ -179,13 +184,10 @@
         
         btn.disabled = true;
         st.style.display = "block";
-        st.innerText = "⏳ Procesando...";
+        st.innerText = "⏳ Procesando datos...";
         st.style.color = "#00a8ff";
 
-        // Convertir fotos
-        const f1 = await toBase64(document.getElementById('foto1').files[0]);
-        const f2 = await toBase64(document.getElementById('foto2').files[0]);
-
+        // Captura de datos
         const payload = {
             hojaCodigo: document.getElementById('hojaCodigo').value || "SIN_ID",
             fechaHora: document.getElementById('fechaHora').value,
@@ -193,97 +195,85 @@
             responsable: document.getElementById('responsable').value,
             tipo: document.getElementById('tipo').value,
             descripcion: document.getElementById('descripcion').value,
-            fotoAntes: f1,
-            fotoDespues: f2,
+            fotoAntes: await toBase64(document.getElementById('foto1').files[0]),
+            fotoDespues: await toBase64(document.getElementById('foto2').files[0]),
             timestamp: new Date().getTime()
         };
 
+        // Guardamos siempre localmente primero por seguridad
+        saveLocally(payload);
+        
         if (navigator.onLine) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seg timeout
-
-                await fetch(WEB_APP_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify(payload),
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId);
-                if (navigator.vibrate) navigator.vibrate(200); 
-                st.innerText = "✅ Registro Enviado";
-                st.style.color = "#00ff88";
-                setTimeout(() => window.location.reload(), 2000);
-            } catch (error) {
-                saveLocally(payload, st);
-            }
+            st.innerText = "🚀 Enviando a la nube...";
+            await checkOfflineData(); // Dispara la sincronización inmediata
         } else {
-            saveLocally(payload, st);
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            st.innerText = "⚠️ Guardado en el teléfono (Sin Internet)";
+            st.style.color = "#ff9800";
+            setTimeout(() => window.location.reload(), 3000);
         }
     };
 
-    function saveLocally(payload, st) {
+    function saveLocally(payload) {
         let pending = JSON.parse(localStorage.getItem('pendingSync') || "[]");
         pending.push(payload);
         localStorage.setItem('pendingSync', JSON.stringify(pending));
-        
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]); 
-        st.innerText = "⚠️ Sin internet. Guardado para reenvío automático.";
-        st.style.color = "#ff9800";
-        
-        setTimeout(() => {
-            document.getElementById('mainForm').reset();
-            btnS.disabled = false;
-            st.style.display = "none";
-            window.location.reload();
-        }, 3000);
+        actualizarIconoSync();
+    }
+
+    function actualizarIconoSync() {
+        let pending = JSON.parse(localStorage.getItem('pendingSync') || "[]");
+        document.getElementById('syncIcon').style.display = pending.length > 0 ? "block" : "none";
     }
 
     async function checkOfflineData() {
         if (!navigator.onLine) return;
 
         let pending = JSON.parse(localStorage.getItem('pendingSync') || "[]");
-        if (pending.length === 0) return;
+        if (pending.length === 0) {
+            actualizarIconoSync();
+            return;
+        }
 
-        console.log("Intentando sincronizar " + pending.length + " registros...");
+        // Si estamos en el formulario y enviando, mostramos estado
+        const st = document.getElementById('status');
         
-        const currentPending = [...pending];
-        
-        for (let i = 0; i < currentPending.length; i++) {
+        for (let i = 0; i < pending.length; i++) {
             try {
-                await fetch(WEB_APP_URL, { 
-                    method: 'POST', 
-                    mode: 'no-cors', 
-                    body: JSON.stringify(currentPending[i]) 
+                // Usamos una petición fetch normal
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Importante para Google Apps Script
+                    body: JSON.stringify(pending[i])
                 });
-                
-                // Si funcionó, lo quitamos de la lista
+
+                // Si llegamos aquí, el navegador logró despachar el paquete
+                // Eliminamos de la memoria
                 let updated = JSON.parse(localStorage.getItem('pendingSync') || "[]");
-                updated = updated.filter(item => item.timestamp !== currentPending[i].timestamp);
+                updated = updated.filter(item => item.timestamp !== pending[i].timestamp);
                 localStorage.setItem('pendingSync', JSON.stringify(updated));
                 
-                console.log("Registro sincronizado con éxito.");
+                if (st.style.display === "block") {
+                    st.innerText = "✅ ¡Enviado con éxito!";
+                    st.style.color = "#00ff88";
+                    if (navigator.vibrate) navigator.vibrate(200);
+                    setTimeout(() => window.location.reload(), 2000);
+                }
             } catch (err) {
-                console.log("Fallo sincronización, reintentando luego...");
-                break; 
+                console.log("Reintento fallido, esperando conexión estable...");
+                break;
             }
         }
-
-        if (JSON.parse(localStorage.getItem('pendingSync')).length === 0) {
-            if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-            console.log("Todo sincronizado.");
-        }
+        actualizarIconoSync();
     }
 
-    // Detectar cambio de red
-    window.addEventListener('online', () => {
-        console.log("Internet detectado. Sincronizando...");
-        checkOfflineData();
-    });
+    // Escuchar cuando el usuario vuelve a tocar la pantalla (despierta el navegador)
+    window.addEventListener('focus', checkOfflineData);
+    window.addEventListener('online', checkOfflineData);
 </script>
 </body>
 </html>
+
 
 
 
