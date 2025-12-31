@@ -1,0 +1,207 @@
+ <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Registro Técnico</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <style>
+        :root {
+            --bg: #000000;
+            --card: #121212;
+            --input: #2a2a2a;
+            --border: #333333;
+            --accent: #00a8ff;
+            --text: #ffffff;
+        }
+
+        body { 
+            background-color: var(--bg); color: var(--text); 
+            font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px;
+            display: flex; justify-content: center;
+        }
+
+        .container {
+            width: 100%; max-width: 450px; background: var(--card);
+            padding: 25px; border-radius: 20px; border: 1px solid var(--border);
+            box-sizing: border-box;
+        }
+
+        .header { text-align: center; margin-bottom: 25px; }
+        .id-label { 
+            background: var(--accent); padding: 5px 15px; 
+            border-radius: 50px; font-weight: bold; font-size: 0.9em; 
+        }
+
+        .form-group { margin-bottom: 20px; }
+        label { 
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.75em; color: #888; margin-bottom: 8px; text-transform: uppercase;
+        }
+
+        .input-box { position: relative; display: flex; align-items: center; }
+        .input-box span { position: absolute; left: 12px; color: var(--accent); font-size: 20px; }
+
+        input, select, textarea {
+            width: 100%; padding: 12px 12px 12px 42px;
+            background: var(--input); border: 1px solid var(--border);
+            color: white; border-radius: 10px; font-size: 16px; box-sizing: border-box;
+        }
+
+        .btn-submit {
+            width: 100%; background: var(--accent); color: white; border: none;
+            padding: 16px; border-radius: 12px; font-weight: bold; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            margin-top: 10px; font-size: 1em;
+        }
+
+        .btn-clear {
+            width: 100%; background: transparent; color: #ff5252; border: 1px solid #ff5252;
+            padding: 12px; border-radius: 12px; font-weight: bold; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            margin-top: 15px; font-size: 0.9em;
+        }
+
+        #status { display: none; text-align: center; margin-top: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <span class="id-label" id="displayID">ESCANEE CÓDIGO</span>
+    </div>
+
+    <form id="mainForm">
+        <input type="hidden" id="hojaCodigo">
+
+        <div class="form-group">
+            <label>Fecha y Hora</label>
+            <div class="input-box">
+                <span class="material-symbols-rounded">calendar_today</span>
+                <input type="datetime-local" id="fechaHora" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Duración</label>
+            <div class="input-box">
+                <span class="material-symbols-rounded">timer</span>
+                <input type="text" id="duracion" placeholder="Ej: 30 min / 1 hora" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Responsable</label>
+            <div class="input-box">
+                <span class="material-symbols-rounded">person</span>
+                <input type="text" id="responsable" placeholder="Nombre del técnico" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Tipo</label>
+            <div class="input-box">
+                <span class="material-symbols-rounded">settings</span>
+                <select id="tipo" required>
+                    <option value="">Seleccione...</option>
+                    <option value="preventivo">Preventivo</option>
+                    <option value="correctivo">Correctivo</option>
+                    <option value="programado">Programado</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Descripción</label>
+            <div class="input-box">
+                <span class="material-symbols-rounded" style="top:12px">edit_note</span>
+                <textarea id="descripcion" rows="3" placeholder="Detalle la actividad..." required style="padding-top:12px"></textarea>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+                <label>Foto Antes</label>
+                <input type="file" id="foto1" accept="image/*" capture="camera" style="padding-left:10px; font-size: 10px;">
+            </div>
+            <div class="form-group">
+                <label>Foto Después</label>
+                <input type="file" id="foto2" accept="image/*" capture="camera" style="padding-left:10px; font-size: 10px;">
+            </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btnS">
+            <span class="material-symbols-rounded">cloud_upload</span> GUARDAR REGISTRO
+        </button>
+        
+        <button type="button" class="btn-clear" onclick="window.location.reload()">
+            <span class="material-symbols-rounded">delete</span> LIMPIAR TODO
+        </button>
+    </form>
+    
+    <div id="status"></div>
+</div>
+
+<script>
+    // REEMPLAZAR CON TU URL DE APPS SCRIPT
+    const WEB_APP_URL = "TU_URL_AQUI";
+
+    window.onload = () => {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('id');
+        if(code) {
+            document.getElementById('hojaCodigo').value = code;
+            document.getElementById('displayID').innerText = "ID: " + code;
+        }
+        
+        const ahora = new Date();
+        ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+        document.getElementById('fechaHora').value = ahora.toISOString().slice(0,16);
+    };
+
+    const toBase64 = file => new Promise((resolve) => {
+        if(!file) return resolve(null);
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+    });
+
+    document.getElementById('mainForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btnS');
+        const st = document.getElementById('status');
+        
+        btn.disabled = true;
+        st.style.display = "block";
+        st.innerText = "⏳ Enviando datos...";
+        st.style.color = var(--accent);
+
+        const payload = {
+            hojaCodigo: document.getElementById('hojaCodigo').value,
+            fechaHora: document.getElementById('fechaHora').value,
+            duracion: document.getElementById('duracion').value,
+            responsable: document.getElementById('responsable').value,
+            tipo: document.getElementById('tipo').value,
+            descripcion: document.getElementById('descripcion').value,
+            fotoAntes: await toBase64(document.getElementById('foto1').files[0]),
+            fotoDespues: await toBase64(document.getElementById('foto2').files[0])
+        };
+
+        try {
+            await fetch(WEB_APP_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify(payload)
+            });
+            st.innerText = "✅ Registro Guardado";
+            st.style.color = "#00ff88";
+            setTimeout(() => window.location.reload(), 2000);
+        } catch (error) {
+            st.innerText = "❌ Error de conexión";
+            btn.disabled = false;
+        }
+    };
+</script>
+</body>
+</html>
