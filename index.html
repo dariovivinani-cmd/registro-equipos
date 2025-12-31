@@ -57,28 +57,26 @@
             margin-top: 10px; font-size: 1em;
         }
 
-        .btn-clear {
-            width: 100%; background: transparent; color: #ff5252; border: 1px solid #ff5252;
-            padding: 12px; border-radius: 12px; font-weight: bold; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-            margin-top: 15px; font-size: 0.9em;
-        }
-
         #status { display: none; text-align: center; margin-top: 15px; font-weight: bold; padding: 10px; border-radius: 8px; }
         
-        #syncIcon { display: none; color: #ff9800; font-size: 0.8em; margin-top: 10px; text-align: center; animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        /* Indicador visible de registros pendientes */
+        #syncBanner { 
+            display: none; background: #ff9800; color: black; 
+            padding: 10px; border-radius: 10px; margin-bottom: 15px;
+            text-align: center; font-size: 0.85em; font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
-<div class="container" id="formContainer">
+<div class="container">
+    <div id="syncBanner">
+        <span class="material-symbols-rounded" style="vertical-align: middle;">sync_problem</span> 
+        HAY REGISTROS PENDIENTES POR ENVIAR
+    </div>
+
     <div class="header">
         <span class="id-label" id="displayID">ESCANEE CÓDIGO</span>
-        <div id="syncIcon">
-            <span class="material-symbols-rounded" style="font-size: 16px; vertical-align: middle;">sync</span> 
-            Sincronizando registros pendientes...
-        </div>
     </div>
 
     <form id="mainForm">
@@ -96,7 +94,7 @@
             <label>Duración</label>
             <div class="input-box">
                 <span class="material-symbols-rounded">timer</span>
-                <input type="text" id="duracion" placeholder="Ej: 30 min / 1 hora" required>
+                <input type="text" id="duracion" placeholder="Ej: 30 min" required>
             </div>
         </div>
 
@@ -104,7 +102,7 @@
             <label>Responsable</label>
             <div class="input-box">
                 <span class="material-symbols-rounded">person</span>
-                <input type="text" id="responsable" placeholder="Nombre del técnico" required>
+                <input type="text" id="responsable" placeholder="Nombre" required>
             </div>
         </div>
 
@@ -116,7 +114,6 @@
                     <option value="">Seleccione...</option>
                     <option value="preventivo">Preventivo</option>
                     <option value="correctivo">Correctivo</option>
-                    <option value="programado">Programado</option>
                 </select>
             </div>
         </div>
@@ -124,28 +121,24 @@
         <div class="form-group">
             <label>Descripción</label>
             <div class="input-box">
-                <span class="material-symbols-rounded" style="top:12px">edit_note</span>
-                <textarea id="descripcion" rows="3" placeholder="Detalle la actividad..." required style="padding-top:12px; padding-left: 42px;"></textarea>
+                <span class="material-symbols-rounded">edit_note</span>
+                <textarea id="descripcion" rows="3" required style="padding-left: 42px;"></textarea>
             </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
                 <label>Foto Antes</label>
-                <input type="file" id="foto1" accept="image/*" capture="camera" style="padding-left:10px; font-size: 10px;">
+                <input type="file" id="foto1" accept="image/*" capture="camera">
             </div>
             <div class="form-group">
                 <label>Foto Después</label>
-                <input type="file" id="foto2" accept="image/*" capture="camera" style="padding-left:10px; font-size: 10px;">
+                <input type="file" id="foto2" accept="image/*" capture="camera">
             </div>
         </div>
 
         <button type="submit" class="btn-submit" id="btnS">
             <span class="material-symbols-rounded">cloud_upload</span> GUARDAR REGISTRO
-        </button>
-        
-        <button type="button" class="btn-clear" onclick="limpiarYReiniciar()">
-            <span class="material-symbols-rounded">delete</span> LIMPIAR TODO
         </button>
     </form>
     
@@ -155,11 +148,25 @@
 <script>
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz98xny-dI8JXlQo0Q4imoaIJ7eqtK9E_N-04jJ9UtkADzzgP-j3gBsXStq0UCoNF8aKQ/exec";
 
-    function actualizarFecha() {
-        const ahora = new Date();
-        ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
-        document.getElementById('fechaHora').value = ahora.toISOString().slice(0,16);
-    }
+    // Función para manejar la cola de LocalStorage
+    const ColaManager = {
+        get: () => JSON.parse(localStorage.getItem('cola_v3') || "[]"),
+        add: (item) => {
+            const cola = ColaManager.get();
+            cola.push(item);
+            localStorage.setItem('cola_v3', JSON.stringify(cola));
+            ColaManager.updateUI();
+        },
+        remove: (id) => {
+            const cola = ColaManager.get().filter(i => i.id !== id);
+            localStorage.setItem('cola_v3', JSON.stringify(cola));
+            ColaManager.updateUI();
+        },
+        updateUI: () => {
+            const count = ColaManager.get().length;
+            document.getElementById('syncBanner').style.display = count > 0 ? "block" : "none";
+        }
+    };
 
     window.onload = () => {
         const params = new URLSearchParams(window.location.search);
@@ -168,9 +175,14 @@
             document.getElementById('hojaCodigo').value = code;
             document.getElementById('displayID').innerText = "ID: " + code;
         }
-        actualizarFecha();
-        checkOfflineData();
-        setInterval(checkOfflineData, 15000); // Reintento cada 15 seg
+        
+        const ahora = new Date();
+        ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+        document.getElementById('fechaHora').value = ahora.toISOString().slice(0,16);
+
+        ColaManager.updateUI();
+        // Intentar sincronizar cada 10 segundos de forma automática
+        setInterval(sincronizarTodo, 10000);
     };
 
     const toBase64 = file => new Promise((resolve) => {
@@ -188,9 +200,9 @@
         btn.disabled = true;
         st.style.display = "block";
         st.innerText = "⏳ Procesando...";
-        st.style.color = "#00a8ff";
 
         const payload = {
+            id: Date.now(), // ID único para rastrear
             hojaCodigo: document.getElementById('hojaCodigo').value || "SIN_ID",
             fechaHora: document.getElementById('fechaHora').value,
             duracion: document.getElementById('duracion').value,
@@ -198,89 +210,68 @@
             tipo: document.getElementById('tipo').value,
             descripcion: document.getElementById('descripcion').value,
             fotoAntes: await toBase64(document.getElementById('foto1').files[0]),
-            fotoDespues: await toBase64(document.getElementById('foto2').files[0]),
-            idUnico: "ID_" + Date.now() // Generamos ID único para rastrear el registro
+            fotoDespues: await toBase64(document.getElementById('foto2').files[0])
         };
 
-        // PASO 1: Guardar en memoria local pase lo que pase
-        let cola = JSON.parse(localStorage.getItem('cola_registros') || "[]");
-        cola.push(payload);
-        localStorage.setItem('cola_registros', JSON.stringify(cola));
-
+        // PASO CRÍTICO: Guardar en cola antes de intentar enviar
+        ColaManager.add(payload);
+        
         if (navigator.onLine) {
             st.innerText = "🚀 Enviando...";
-            checkOfflineData(); // Intentar vaciar la cola inmediatamente
+            await sincronizarTodo();
         } else {
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-            st.innerText = "⚠️ Guardado en memoria (Sin Internet)";
+            st.innerText = "⚠️ Sin internet. Guardado en el equipo.";
             st.style.color = "#ff9800";
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             setTimeout(() => {
-                st.style.display = "none";
-                btn.disabled = false;
-                document.getElementById('mainForm').reset();
-                actualizarFecha();
-                document.getElementById('syncIcon').style.display = "block";
+                location.reload();
             }, 3000);
         }
     };
 
-    async function checkOfflineData() {
+    async function sincronizarTodo() {
         if (!navigator.onLine) return;
+        
+        const cola = ColaManager.get();
+        if (cola.length === 0) return;
 
-        let cola = JSON.parse(localStorage.getItem('cola_registros') || "[]");
-        if (cola.length === 0) {
-            document.getElementById('syncIcon').style.display = "none";
-            return;
-        }
-
-        document.getElementById('syncIcon').style.display = "block";
-        const st = document.getElementById('status');
-
-        // Procesar uno por uno
-        for (let i = 0; i < cola.length; i++) {
-            const registro = cola[i];
+        for (const item of cola) {
             try {
-                const response = await fetch(WEB_APP_URL, {
+                // Usamos fetch con un tiempo de espera (timeout)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+                await fetch(WEB_APP_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    body: JSON.stringify(registro)
+                    body: JSON.stringify(item),
+                    signal: controller.signal
                 });
 
-                // Si se envió, lo borramos de la memoria
-                let colaActual = JSON.parse(localStorage.getItem('cola_registros') || "[]");
-                colaActual = colaActual.filter(item => item.idUnico !== registro.idUnico);
-                localStorage.setItem('cola_registros', JSON.stringify(colaActual));
+                clearTimeout(timeoutId);
+                // Si llegamos aquí sin error, eliminamos de la cola
+                ColaManager.remove(item.id);
                 
-                if (st.style.display === "block") {
-                    st.innerText = "✅ Registro Exitoso";
+                // Si el formulario está abierto y enviando este item
+                const st = document.getElementById('status');
+                if(st.innerText.includes("Enviando")){
+                    st.innerText = "✅ ¡Registro Guardado!";
                     st.style.color = "#00ff88";
                     if (navigator.vibrate) navigator.vibrate(200);
-                    setTimeout(() => window.location.reload(), 2000);
+                    setTimeout(() => location.reload(), 2000);
                 }
             } catch (err) {
-                console.log("Error de conexión, el registro sigue en cola.");
-                break; // Parar si falla para no saturar
+                console.log("Error de red en el item:", item.id);
+                // No lo borramos de la cola, reintentará en 10 seg.
             }
-        }
-        
-        let colaFinal = JSON.parse(localStorage.getItem('cola_registros') || "[]");
-        document.getElementById('syncIcon').style.display = colaFinal.length > 0 ? "block" : "none";
-    }
-
-    function limpiarYReiniciar() {
-        if(confirm("¿Seguro que quieres limpiar el formulario? Esto no borrará los registros pendientes de envío.")){
-            window.location.reload();
         }
     }
 
     // Detectar cuando el internet regresa
-    window.addEventListener('online', checkOfflineData);
-    // Detectar cuando el técnico vuelve a la pestaña
-    window.addEventListener('focus', checkOfflineData);
+    window.addEventListener('online', sincronizarTodo);
 </script>
 </body>
 </html>
-
 
 
 
