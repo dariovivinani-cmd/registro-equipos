@@ -3,170 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Registro Técnico EH-LVB</title>
+    <title>Registro EH-LVB</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
     <style>
-        :root {
-            --bg: #000000;
-            --card: #121212;
-            --input: #2a2a2a;
-            --border: #333333;
-            --accent: #00a8ff;
-            --text: #ffffff;
-        }
-
-        body { 
-            background-color: var(--bg); color: var(--text); 
-            font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px;
-            display: flex; justify-content: center; align-items: flex-start;
-            min-height: 100vh;
-        }
-
-        .container {
-            width: 100%; max-width: 450px; background: var(--card);
-            padding: 25px; border-radius: 20px; border: 1px solid var(--border);
-            box-sizing: border-box; display: block !important;
-        }
-
-        .header { text-align: center; margin-bottom: 25px; }
-        .id-label { 
-            background: var(--accent); padding: 8px 20px; 
-            border-radius: 50px; font-weight: bold; font-size: 0.9em; 
-            color: white; display: inline-block;
-        }
-
-        .form-group { margin-bottom: 20px; }
-        label { 
-            display: flex; align-items: center; gap: 8px;
-            font-size: 0.75em; color: #888; margin-bottom: 8px; text-transform: uppercase;
-        }
-
-        .input-box { position: relative; display: flex; align-items: center; }
-        .input-box span { position: absolute; left: 12px; color: var(--accent); font-size: 20px; }
-
-        input, select, textarea {
-            width: 100%; padding: 12px 12px 12px 42px;
-            background: var(--input); border: 1px solid var(--border);
-            color: white; border-radius: 10px; font-size: 16px; box-sizing: border-box;
-        }
-
-        .btn-submit {
-            width: 100%; background: var(--accent); color: white; border: none;
-            padding: 16px; border-radius: 12px; font-weight: bold; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-            margin-top: 10px; font-size: 1em;
-        }
-
-        #status { display: none; text-align: center; margin-top: 15px; font-weight: bold; padding: 10px; border-radius: 8px; }
-        
-        /* Indicador visible de registros pendientes */
-        #syncBanner { 
-            display: none; background: #ff9800; color: black; 
-            padding: 10px; border-radius: 10px; margin-bottom: 15px;
-            text-align: center; font-size: 0.85em; font-weight: bold;
-        }
+        :root { --bg: #000000; --card: #121212; --accent: #00a8ff; --text: #ffffff; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; padding: 15px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 450px; background: var(--card); padding: 20px; border-radius: 15px; border: 1px solid #333; }
+        .id-label { background: var(--accent); padding: 5px 15px; border-radius: 20px; font-size: 0.8em; margin-bottom: 20px; display: inline-block; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.7em; color: #888; margin-bottom: 5px; text-transform: uppercase; }
+        input, select, textarea { width: 100%; padding: 12px; background: #222; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        .btn-submit { width: 100%; background: var(--accent); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 1em; cursor: pointer; margin-top: 10px; }
+        #status { display: none; text-align: center; margin-top: 15px; padding: 10px; border-radius: 5px; font-weight: bold; }
+        #pendingInfo { display: none; background: #e67e22; color: white; padding: 8px; text-align: center; border-radius: 5px; margin-bottom: 10px; font-size: 0.8em; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="syncBanner">
-        <span class="material-symbols-rounded" style="vertical-align: middle;">sync_problem</span> 
-        HAY REGISTROS PENDIENTES POR ENVIAR
-    </div>
-
-    <div class="header">
+    <div id="pendingInfo">⚠️ Tienes registros pendientes por enviar</div>
+    <div class="header" style="text-align:center">
         <span class="id-label" id="displayID">ESCANEE CÓDIGO</span>
     </div>
 
     <form id="mainForm">
         <input type="hidden" id="hojaCodigo">
-
-        <div class="form-group">
-            <label>Fecha y Hora</label>
-            <div class="input-box">
-                <span class="material-symbols-rounded">calendar_today</span>
-                <input type="datetime-local" id="fechaHora" required>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label>Duración</label>
-            <div class="input-box">
-                <span class="material-symbols-rounded">timer</span>
-                <input type="text" id="duracion" placeholder="Ej: 30 min" required>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label>Responsable</label>
-            <div class="input-box">
-                <span class="material-symbols-rounded">person</span>
-                <input type="text" id="responsable" placeholder="Nombre" required>
-            </div>
-        </div>
-
+        <div class="form-group"><label>Fecha y Hora</label><input type="datetime-local" id="fechaHora" required></div>
+        <div class="form-group"><label>Duración</label><input type="text" id="duracion" placeholder="Ej: 30 min" required></div>
+        <div class="form-group"><label>Responsable</label><input type="text" id="responsable" placeholder="Nombre" required></div>
         <div class="form-group">
             <label>Tipo</label>
-            <div class="input-box">
-                <span class="material-symbols-rounded">settings</span>
-                <select id="tipo" required>
-                    <option value="">Seleccione...</option>
-                    <option value="preventivo">Preventivo</option>
-                    <option value="correctivo">Correctivo</option>
-                </select>
-            </div>
+            <select id="tipo" required>
+                <option value="">Seleccione...</option>
+                <option value="preventivo">Preventivo</option>
+                <option value="correctivo">Correctivo</option>
+            </select>
         </div>
-
-        <div class="form-group">
-            <label>Descripción</label>
-            <div class="input-box">
-                <span class="material-symbols-rounded">edit_note</span>
-                <textarea id="descripcion" rows="3" required style="padding-left: 42px;"></textarea>
-            </div>
-        </div>
-
+        <div class="form-group"><label>Descripción</label><textarea id="descripcion" rows="3" required></textarea></div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div class="form-group">
-                <label>Foto Antes</label>
-                <input type="file" id="foto1" accept="image/*" capture="camera">
-            </div>
-            <div class="form-group">
-                <label>Foto Después</label>
-                <input type="file" id="foto2" accept="image/*" capture="camera">
-            </div>
+            <div class="form-group"><label>Foto Antes</label><input type="file" id="foto1" accept="image/*" capture="camera"></div>
+            <div class="form-group"><label>Foto Después</label><input type="file" id="foto2" accept="image/*" capture="camera"></div>
         </div>
-
-        <button type="submit" class="btn-submit" id="btnS">
-            <span class="material-symbols-rounded">cloud_upload</span> GUARDAR REGISTRO
-        </button>
+        <button type="submit" class="btn-submit" id="btnS">GUARDAR REGISTRO</button>
     </form>
-    
     <div id="status"></div>
 </div>
 
 <script>
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz98xny-dI8JXlQo0Q4imoaIJ7eqtK9E_N-04jJ9UtkADzzgP-j3gBsXStq0UCoNF8aKQ/exec";
-
-    // Función para manejar la cola de LocalStorage
-    const ColaManager = {
-        get: () => JSON.parse(localStorage.getItem('cola_v3') || "[]"),
-        add: (item) => {
-            const cola = ColaManager.get();
-            cola.push(item);
-            localStorage.setItem('cola_v3', JSON.stringify(cola));
-            ColaManager.updateUI();
-        },
-        remove: (id) => {
-            const cola = ColaManager.get().filter(i => i.id !== id);
-            localStorage.setItem('cola_v3', JSON.stringify(cola));
-            ColaManager.updateUI();
-        },
-        updateUI: () => {
-            const count = ColaManager.get().length;
-            document.getElementById('syncBanner').style.display = count > 0 ? "block" : "none";
-        }
-    };
 
     window.onload = () => {
         const params = new URLSearchParams(window.location.search);
@@ -175,34 +59,31 @@
             document.getElementById('hojaCodigo').value = code;
             document.getElementById('displayID').innerText = "ID: " + code;
         }
-        
         const ahora = new Date();
         ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
         document.getElementById('fechaHora').value = ahora.toISOString().slice(0,16);
-
-        ColaManager.updateUI();
-        // Intentar sincronizar cada 10 segundos de forma automática
-        setInterval(sincronizarTodo, 10000);
+        
+        checkQueue();
     };
 
     const toBase64 = file => new Promise((resolve) => {
         if(!file) return resolve(null);
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
         reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
     });
 
     document.getElementById('mainForm').onsubmit = async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btnS');
         const st = document.getElementById('status');
-        
         btn.disabled = true;
         st.style.display = "block";
         st.innerText = "⏳ Procesando...";
+        st.style.color = "white";
 
         const payload = {
-            id: Date.now(), // ID único para rastrear
+            id: Date.now(),
             hojaCodigo: document.getElementById('hojaCodigo').value || "SIN_ID",
             fechaHora: document.getElementById('fechaHora').value,
             duracion: document.getElementById('duracion').value,
@@ -213,65 +94,67 @@
             fotoDespues: await toBase64(document.getElementById('foto2').files[0])
         };
 
-        // PASO CRÍTICO: Guardar en cola antes de intentar enviar
-        ColaManager.add(payload);
+        addToQueue(payload);
         
         if (navigator.onLine) {
             st.innerText = "🚀 Enviando...";
-            await sincronizarTodo();
+            processQueue();
         } else {
-            st.innerText = "⚠️ Sin internet. Guardado en el equipo.";
+            st.innerText = "⚠️ Guardado en memoria (Sin Internet)";
             st.style.color = "#ff9800";
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-            setTimeout(() => {
-                location.reload();
-            }, 3000);
+            if(navigator.vibrate) navigator.vibrate([100,50,100]);
+            setTimeout(() => location.reload(), 3000);
         }
     };
 
-    async function sincronizarTodo() {
+    function addToQueue(item) {
+        let queue = JSON.parse(localStorage.getItem('form_queue') || "[]");
+        queue.push(item);
+        localStorage.setItem('form_queue', JSON.stringify(queue));
+        checkQueue();
+    }
+
+    async function processQueue() {
         if (!navigator.onLine) return;
-        
-        const cola = ColaManager.get();
-        if (cola.length === 0) return;
+        let queue = JSON.parse(localStorage.getItem('form_queue') || "[]");
+        if (queue.length === 0) return;
 
-        for (const item of cola) {
+        for (let item of queue) {
             try {
-                // Usamos fetch con un tiempo de espera (timeout)
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 20000);
-
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    body: JSON.stringify(item),
-                    signal: controller.signal
+                    body: JSON.stringify(item)
                 });
+                // Si el fetch no da error, eliminamos
+                let currentQueue = JSON.parse(localStorage.getItem('form_queue') || "[]");
+                currentQueue = currentQueue.filter(q => q.id !== item.id);
+                localStorage.setItem('form_queue', JSON.stringify(currentQueue));
+            } catch (e) { console.log(e); break; }
+        }
 
-                clearTimeout(timeoutId);
-                // Si llegamos aquí sin error, eliminamos de la cola
-                ColaManager.remove(item.id);
-                
-                // Si el formulario está abierto y enviando este item
-                const st = document.getElementById('status');
-                if(st.innerText.includes("Enviando")){
-                    st.innerText = "✅ ¡Registro Guardado!";
-                    st.style.color = "#00ff88";
-                    if (navigator.vibrate) navigator.vibrate(200);
-                    setTimeout(() => location.reload(), 2000);
-                }
-            } catch (err) {
-                console.log("Error de red en el item:", item.id);
-                // No lo borramos de la cola, reintentará en 10 seg.
-            }
+        checkQueue();
+        const st = document.getElementById('status');
+        if(st.innerText === "🚀 Enviando...") {
+            st.innerText = "✅ Registro Exitoso";
+            st.style.color = "#00ff88";
+            if(navigator.vibrate) navigator.vibrate(200);
+            setTimeout(() => location.reload(), 2000);
         }
     }
 
-    // Detectar cuando el internet regresa
-    window.addEventListener('online', sincronizarTodo);
+    function checkQueue() {
+        let queue = JSON.parse(localStorage.getItem('form_queue') || "[]");
+        document.getElementById('pendingInfo').style.display = queue.length > 0 ? "block" : "none";
+    }
+
+    window.addEventListener('online', processQueue);
+    setInterval(processQueue, 15000);
 </script>
+
 </body>
 </html>
+
 
 
 
