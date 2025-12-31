@@ -160,14 +160,16 @@
         ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
         document.getElementById('fechaHora').value = ahora.toISOString().slice(0,16);
 
-        checkOfflineData();
+        // Intentar enviar datos apenas cargue la página si hay internet
+        setTimeout(checkOfflineData, 1000);
     };
 
     const toBase64 = file => new Promise((resolve) => {
         if(!file) return resolve(null);
         const reader = new FileReader();
-        reader.readAsDataURL(file);
         reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
     });
 
     document.getElementById('mainForm').onsubmit = async (e) => {
@@ -180,6 +182,10 @@
         st.innerText = "⏳ Procesando...";
         st.style.color = "#00a8ff";
 
+        // Convertir fotos
+        const f1 = await toBase64(document.getElementById('foto1').files[0]);
+        const f2 = await toBase64(document.getElementById('foto2').files[0]);
+
         const payload = {
             hojaCodigo: document.getElementById('hojaCodigo').value || "SIN_ID",
             fechaHora: document.getElementById('fechaHora').value,
@@ -187,47 +193,51 @@
             responsable: document.getElementById('responsable').value,
             tipo: document.getElementById('tipo').value,
             descripcion: document.getElementById('descripcion').value,
-            fotoAntes: await toBase64(document.getElementById('foto1').files[0]),
-            fotoDespues: await toBase64(document.getElementById('foto2').files[0])
+            fotoAntes: f1,
+            fotoDespues: f2,
+            timestamp: new Date().getTime()
         };
 
         if (navigator.onLine) {
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seg timeout
+
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
                 });
                 
-                // --- VIBRACIÓN DE ÉXITO ---
+                clearTimeout(timeoutId);
                 if (navigator.vibrate) navigator.vibrate(200); 
-                
                 st.innerText = "✅ Registro Enviado";
                 st.style.color = "#00ff88";
                 setTimeout(() => window.location.reload(), 2000);
             } catch (error) {
-                saveLocally(payload);
-                mostrarOffline(st);
+                saveLocally(payload, st);
             }
         } else {
-            saveLocally(payload);
-            mostrarOffline(st);
+            saveLocally(payload, st);
         }
     };
 
-    function mostrarOffline(st) {
-        // --- VIBRACIÓN DE ADVERTENCIA (Dos toques) ---
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]); 
-        
-        st.innerText = "⚠️ Sin conexión. Guardado en memoria local.";
-        st.style.color = "#ff9800";
-        setTimeout(() => window.location.reload(), 3500);
-    }
-
-    function saveLocally(payload) {
+    function saveLocally(payload, st) {
         let pending = JSON.parse(localStorage.getItem('pendingSync') || "[]");
         pending.push(payload);
         localStorage.setItem('pendingSync', JSON.stringify(pending));
+        
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]); 
+        st.innerText = "⚠️ Sin internet. Guardado para reenvío automático.";
+        st.style.color = "#ff9800";
+        
+        setTimeout(() => {
+            document.getElementById('mainForm').reset();
+            btnS.disabled = false;
+            st.style.display = "none";
+            window.location.reload();
+        }, 3000);
     }
 
     async function checkOfflineData() {
@@ -236,34 +246,45 @@
         let pending = JSON.parse(localStorage.getItem('pendingSync') || "[]");
         if (pending.length === 0) return;
 
-        const toSync = [...pending];
+        console.log("Intentando sincronizar " + pending.length + " registros...");
         
-        for (let data of toSync) {
+        const currentPending = [...pending];
+        
+        for (let i = 0; i < currentPending.length; i++) {
             try {
                 await fetch(WEB_APP_URL, { 
                     method: 'POST', 
                     mode: 'no-cors', 
-                    body: JSON.stringify(data) 
+                    body: JSON.stringify(currentPending[i]) 
                 });
-                let currentPending = JSON.parse(localStorage.getItem('pendingSync') || "[]");
-                currentPending.shift(); 
-                localStorage.setItem('pendingSync', JSON.stringify(currentPending));
+                
+                // Si funcionó, lo quitamos de la lista
+                let updated = JSON.parse(localStorage.getItem('pendingSync') || "[]");
+                updated = updated.filter(item => item.timestamp !== currentPending[i].timestamp);
+                localStorage.setItem('pendingSync', JSON.stringify(updated));
+                
+                console.log("Registro sincronizado con éxito.");
             } catch (err) {
+                console.log("Fallo sincronización, reintentando luego...");
                 break; 
             }
         }
 
         if (JSON.parse(localStorage.getItem('pendingSync')).length === 0) {
-            // Vibración suave al terminar sincronización de fondo
             if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-            console.log("Sincronización completada.");
+            console.log("Todo sincronizado.");
         }
     }
 
-    window.addEventListener('online', checkOfflineData);
+    // Detectar cambio de red
+    window.addEventListener('online', () => {
+        console.log("Internet detectado. Sincronizando...");
+        checkOfflineData();
+    });
 </script>
 </body>
 </html>
+
 
 
 
