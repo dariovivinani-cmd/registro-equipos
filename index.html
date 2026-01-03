@@ -53,8 +53,9 @@
 </div>
 
 <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz98xny-dI8JXlQo0Q4imoaIJ7eqtK9E_N-04jJ9UtkADzzgP-j3gBsXStq0UCoNF8aKQ/exec";
+    const WEB_APP_URL = "TU_URL_AQUI"; // REEMPLAZA CON TU URL REAL
     let isProcessing = false;
+    let sendingIds = new Set(); // Para evitar enviar el mismo ID dos veces en la misma sesión
 
     function setFechaActual() {
         const ahora = new Date();
@@ -116,7 +117,7 @@
         st.style.color = "white";
 
         const payload = {
-            id: "ID-" + Date.now(),
+            id: "ID-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
             hojaCodigo: document.getElementById('hojaCodigo').value || "SIN_ID",
             fechaHora: document.getElementById('fechaHora').value,
             duracion: document.getElementById('duracion').value,
@@ -127,23 +128,18 @@
             fotoDespues: await resizeImage(document.getElementById('foto2').files[0])
         };
 
+        // Siempre lo guardamos en cola primero por seguridad
+        guardarEnPendientes(payload);
+        
+        // Intentamos enviarlo de inmediato si hay red
         if (navigator.onLine) {
-            isProcessing = true;
-            st.innerText = "🚀 Enviando...";
-            try {
-                await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-                st.innerText = "✅ ¡Guardado!";
-                st.style.color = "#00ff88";
-                document.getElementById('mainForm').reset();
-                setFechaActual();
-                setTimeout(() => { st.style.display = "none"; btn.disabled = false; }, 2500);
-            } catch (error) {
-                guardarEnPendientes(payload);
-            } finally {
-                isProcessing = false;
-            }
+            processQueue();
         } else {
-            guardarEnPendientes(payload);
+            document.getElementById('mainForm').reset();
+            setFechaActual();
+            st.innerText = "⚠️ Sin internet: Guardado en cola";
+            st.style.color = "#ff9800";
+            setTimeout(() => { st.style.display = "none"; btn.disabled = false; }, 3000);
         }
     };
 
@@ -153,32 +149,61 @@
             queue.push(item);
             localStorage.setItem('form_queue_v4', JSON.stringify(queue));
         }
-        document.getElementById('status').innerText = "⚠️ Guardado en memoria";
-        document.getElementById('status').style.color = "#ff9800";
         checkQueue();
-        document.getElementById('mainForm').reset();
-        setFechaActual();
-        setTimeout(() => { 
-            document.getElementById('status').style.display = "none"; 
-            document.getElementById('btnS').disabled = false; 
-        }, 3000);
     }
 
     async function processQueue() {
         if (!navigator.onLine || isProcessing) return;
+        
         let queue = JSON.parse(localStorage.getItem('form_queue_v4') || "[]");
         if (queue.length === 0) { checkQueue(); return; }
+
         isProcessing = true;
-        for (let item of queue) {
+        
+        // Copia de la cola para iterar
+        let itemsToProcess = [...queue];
+
+        for (let item of itemsToProcess) {
+            // Si el ID ya se está enviando en esta ejecución, saltarlo
+            if (sendingIds.has(item.id)) continue;
+
             try {
-                await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(item) });
+                sendingIds.add(item.id);
+                
+                await fetch(WEB_APP_URL, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    body: JSON.stringify(item) 
+                });
+
+                // ELIMINACIÓN INMEDIATA TRAS ÉXITO
                 let currentQueue = JSON.parse(localStorage.getItem('form_queue_v4') || "[]");
                 currentQueue = currentQueue.filter(q => q.id !== item.id);
                 localStorage.setItem('form_queue_v4', JSON.stringify(currentQueue));
-                checkQueue();
-            } catch (e) { break; }
+                
+                sendingIds.delete(item.id);
+                
+                // Si el formulario estaba esperando este envío específico:
+                const st = document.getElementById('status');
+                if (st.style.display === "block") {
+                    st.innerText = "✅ ¡Registro Exitoso!";
+                    st.style.color = "#00ff88";
+                    document.getElementById('mainForm').reset();
+                    setFechaActual();
+                    setTimeout(() => { 
+                        st.style.display = "none"; 
+                        document.getElementById('btnS').disabled = false; 
+                    }, 2000);
+                }
+            } catch (e) {
+                sendingIds.delete(item.id);
+                console.error("Error en cola:", e);
+                break; 
+            }
         }
+        
         isProcessing = false;
+        checkQueue();
     }
 
     function checkQueue() {
@@ -187,7 +212,8 @@
     }
 
     window.addEventListener('online', processQueue);
-    setInterval(processQueue, 30000);
+    // Intervalo más largo para evitar colisiones
+    setInterval(processQueue, 45000); 
 </script>
 </body>
 </html>
