@@ -37,6 +37,7 @@
                 <option value="">Seleccione...</option>
                 <option value="preventivo">Preventivo</option>
                 <option value="correctivo">Correctivo</option>
+                <option value="programado">Programado</option>
             </select>
         </div>
         <div class="form-group"><label>Descripción</label><textarea id="descripcion" rows="3" required></textarea></div>
@@ -51,8 +52,7 @@
 </div>
 
 <script>
-    // URL DE TU APP SCRIPT - VERIFICA QUE SEA LA ACTUAL
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyBSYMiZcSgPRjjiyfrAgL5BvR428GjgR3BFxihbvnT3e2F83macTLYPkAgSXqGnLpgHw/exec ";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz98xny-dI8JXlQo0Q4imoaIJ7eqtK9E_N-04jJ9UtkADzzgP-j3gBsXStq0UCoNF8aKQ/exec";
 
     function setFechaActual() {
         const ahora = new Date();
@@ -61,7 +61,7 @@
     }
 
     function limpiarFormulario() {
-        if(confirm("¿Borrar datos?")) {
+        if(confirm("¿Borrar datos del formulario?")) {
             document.getElementById('mainForm').reset();
             setFechaActual();
             document.getElementById('status').style.display = "none";
@@ -122,8 +122,7 @@
         };
 
         try {
-            // INTENTO DE ENVÍO DIRECTO
-            const response = await fetch(WEB_APP_URL, {
+            await fetch(WEB_APP_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 body: JSON.stringify(payload)
@@ -136,12 +135,10 @@
             setTimeout(() => { st.style.display = "none"; btn.disabled = false; }, 2000);
 
         } catch (error) {
-            // SI FALLA (POR INTERNET), GUARDAR EN COLA
             let queue = JSON.parse(localStorage.getItem('cola_v5') || "[]");
             queue.push(payload);
             localStorage.setItem('cola_v5', JSON.stringify(queue));
-            
-            st.innerText = "⚠️ Guardado en memoria (Sin internet)";
+            st.innerText = "⚠️ Guardado en memoria";
             st.style.color = "#ff9800";
             checkQueue();
             document.getElementById('mainForm').reset();
@@ -155,21 +152,14 @@
         let queue = JSON.parse(localStorage.getItem('cola_v5') || "[]");
         if (queue.length === 0) return;
 
-        // Enviamos el primero de la lista
         const item = queue[0];
         try {
             await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(item) });
-            
-            // Si funciona, lo quitamos de la lista
             queue.shift();
             localStorage.setItem('cola_v5', JSON.stringify(queue));
             checkQueue();
-            
-            // Si quedan más, procesar el siguiente tras un breve respiro
-            if (queue.length > 0) setTimeout(processQueue, 1000);
-        } catch (e) {
-            console.log("Error reintentando...");
-        }
+            if (queue.length > 0) setTimeout(processQueue, 1500);
+        } catch (e) {}
     }
 
     function checkQueue() {
@@ -177,12 +167,12 @@
         document.getElementById('pendingInfo').style.display = queue.length > 0 ? "block" : "none";
     }
 
-    // Reintentar cuando vuelva el internet
     window.addEventListener('online', processQueue);
-    setInterval(processQueue, 60000); // Reintento cada minuto
+    setInterval(processQueue, 60000);
 </script>
 </body>
 </html>
+
 
 
 
